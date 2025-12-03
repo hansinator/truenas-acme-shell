@@ -132,6 +132,48 @@ https://github.com/acmesh-official/acme.sh/wiki/dnsapi
 
 ---
 
+## 👤 Recommended Service User (`acme`)
+
+For security, it’s better **not** to run the script as `root` if you don’t have to.
+
+### Option A (recommended): Dedicated `acme` user
+
+1. Create a user in the TrueNAS UI (CORE/SCALE):  
+   - **Name:** `acme`  
+   - No SSH / no shell login required (service-style user).  
+
+2. Make sure `acme` can read the wrapper and credentials:
+
+    chown acme:acme /path/to/truenas-acme-shell/credentials
+    chmod 600 /path/to/truenas-acme-shell/credentials
+
+   The script itself can stay owned by any user as long as it’s executable:
+
+    chmod 755 /path/to/truenas-acme-shell/acmeShellAuth.sh
+
+3. Ensure `acme` has read/execute access to the acme.sh directory:
+
+    # simplest: keep git clone with world-read/execute
+    chmod -R a+rX /path/to/acme.sh
+
+(You can tighten this further if desired, as long as the `acme` user can still read the needed files.)
+
+You can then select `acme` as **Run As User** in the TrueNAS authenticator.
+
+### Option B: Use `root`
+
+If you don’t want to create a dedicated user:
+
+- Set **Run As User:** `root` in the TrueNAS authenticator.  
+- Make sure `credentials` is owned by and readable only for root:
+
+    chown root:root /path/to/truenas-acme-shell/credentials
+    chmod 600 /path/to/truenas-acme-shell/credentials
+
+This is simpler but grants the script full root privileges.
+
+---
+
 ## 🛠️ TrueNAS Setup
 
 ### 1. Add the Shell ACME DNS Authenticator
@@ -144,9 +186,15 @@ In the TrueNAS UI:
    - **Authenticator:** `Shell`  
    - **Script path:**  
      `/path/to/truenas-acme-shell/acmeShellAuth.sh`  
-   - **Run As User:** a user that can read `credentials` and execute the script (often `root` or a dedicated system user)  
-   - **Timeout:** e.g. `600`  
-   - **Propagation Delay:** e.g. `120–300` seconds (depends on your DNS provider)  
+   - **Run As User:**  
+     - recommended: `acme` (dedicated user as described above)  
+     - alternative: `root`  
+   - **Timeout:** `600`  
+     - This is how long TrueNAS will wait for each `set`/`unset` call.  
+     - 600 seconds (10 minutes) is a safe default; typical DNS API calls finish in a few seconds.  
+   - **Propagation Delay:** `120` (or `180` if you want extra margin)  
+     - This is how long TrueNAS waits *after* `set` returns before doing the DNS-01 check.  
+     - 120–180 seconds avoids random validation failures when DNS propagation is slightly delayed.
 
 No environment variables are required in the TrueNAS UI; the script reads everything from `credentials`.
 
